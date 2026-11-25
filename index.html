@@ -74,6 +74,7 @@ td:first-child,th:first-child{text-align:left}
   <div id="status">Press Start, then play with the beat.</div>
   <div id="result"><div id="dot"></div><div><div id="resText"></div><div id="resSmall"></div></div></div>
   <div id="week"></div>
+  <div id="diag" style="color:var(--muted);font-size:13px;max-width:560px"></div>
 </main>
 <button id="gear" aria-label="Parent settings">⚙</button>
 <div id="gate"><div class="gbox">
@@ -144,6 +145,7 @@ async function ensureAudio(){
       {audio:{echoCancellation:false}},
       {audio:true}
     ];
+    try{ const devs = await navigator.mediaDevices.enumerateDevices(); const mic = devs.find(d => d.kind === 'audioinput' && d.deviceId); if(mic) tries.push({audio:{deviceId:mic.deviceId}}); }catch(_){}
     let lastErr = null;
     for(const c of tries){
       try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }
@@ -233,7 +235,12 @@ async function startPractice(){
         ? 'The microphone is blocked. Allow it for this site in the browser, and for the browser in the device settings.'
         : e && e.name === 'NotFoundError' ? 'No microphone was found.'
         : 'I couldn\'t start the microphone (' + ((e && e.name) || 'unknown error') + ').';
-    $('status').textContent = why; busy = false; return;
+    $('status').textContent = why;
+    let diag = 'v0.6 · ' + ((e && e.name) || '?') + (e && e.constraint ? ' on "' + e.constraint + '"' : '') + (e && e.message ? ' · ' + e.message : '');
+    try{ const devs = await navigator.mediaDevices.enumerateDevices(); diag += ' · microphones found: ' + devs.filter(d => d.kind === 'audioinput').length; }catch(_){}
+    diag += ' · ' + navigator.userAgent.replace(/^Mozilla\/5\.0 /,'').slice(0,90);
+    $('diag').textContent = diag;
+    busy = false; return;
   }
   $('result').classList.remove('show');
   chunks = []; recording = true; if(worklet) recNode.port.postMessage(true);
@@ -367,8 +374,13 @@ function analyze(chs, sch){
       let pk = 0; for(let j=n.s; j<=Math.min(n.e, n.s+3); j++) pk = Math.max(pk, rms[j]);
       while(f > 0 && f > n.s - 3 && rms[f-1] >= 0.35*pk) f--;
     }
-    n.tRec = ft[f];
     n.m = median(n.ms); n.cents = (n.m - Math.round(n.m))*100;
+    if(n.type === 'change'){
+      // onset = when the pitch arrives at the new note, not the first frame of the slide
+      for(let j=n.s; j<=Math.min(n.e, n.s+12); j++){ if(!isNaN(midi[j]) && Math.abs(midi[j]-n.m) < 0.5){ f = j; break; } }
+    }
+    n.tRec = ft[f];
+    n.durS = (n.e - n.s + 1)*hop/sr2;
   }
 
   // compare with the beat
@@ -376,20 +388,24 @@ function analyze(chs, sch){
   const mult = {easy:1.4, normal:1, strict:0.7}[S.strict] || 1;
   const tol = Math.min(0.12, Math.max(0.06, 0.2*sub))*mult;
   const lastBeat = sch.beats.length ? sch.beats[sch.beats.length-1].t : firstPlay;
-  const ev = notes.map(n => ({...n, t: n.tRec - L - S.offset/1000}))
+  const minDur = Math.min(0.12, 0.35*sub);
+  const ev = notes.filter(n => n.durS >= minDur).map(n => ({...n, t: n.tRec - L - S.offset/1000}))
                   .filter(n => n.t >= firstPlay - 0.5*sub && n.t <= Math.max(lastBeat, sch.stopAt) + sub);
   const take = {x, sr, t0, sch, cal, notes, ev, firstPlay, sub, tol, rms, ft, midi};
   lastTake = take;
   if(ev.length < 5) return {color:'yellow', text:"I couldn't hear enough notes. Try again a little closer to the iPad.", take};
 
-  const seen = new Set(), graded = [];
+  const byK = new Map(), graded = [];
   for(const n of ev){
     const k = Math.round((n.t - firstPlay)/sub); n.k = k; n.off = n.t - (firstPlay + k*sub);
     const beatIdx = Math.floor(k/sch.perBeat), bar = Math.floor(beatIdx/sch.bpb);
     n.quiet = !(sch.pattern === 'always' || bar < 1 || (bar % (sch.pattern.split('-').map(Number).reduce((a,b)=>a+b))) < Number(sch.pattern.split('-')[0]));
     n.ok = Math.abs(n.off) <= tol;
-    if(!seen.has(k)){ seen.add(k); graded.push(n); }
+    const prev = byK.get(k);
+    if(!prev || n.durS > prev.durS) byK.set(k, n);
   }
+  for(const n of byK.values()) graded.push(n);
+  graded.sort((a,b) => a.t - b.t);
   const total = graded.length, onBeat = graded.filter(n => n.ok).length, pct = onBeat/total;
   const near = graded.filter(n => Math.abs(n.off) < 0.4*sub);
   const meanOff = near.length ? near.reduce((a,n)=>a+n.off,0)/near.length : 0;
@@ -560,5 +576,6 @@ $('copyInfo').addEventListener('click', async () => { try{ await navigator.clipb
 renderHeader(); renderWeek();
 }
 </script>
+<div style="position:fixed;left:12px;bottom:8px;color:#cdb7a466;font-size:12px">v0.6</div>
 </body>
 </html>

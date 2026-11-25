@@ -139,7 +139,17 @@ async function ensureAudio(){
   if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); }
   if(ctx.state !== 'running') await ctx.resume();
   if(!stream){
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    const tries = [
+      {audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}},
+      {audio:{echoCancellation:false}},
+      {audio:true}
+    ];
+    let lastErr = null;
+    for(const c of tries){
+      try{ stream = await navigator.mediaDevices.getUserMedia(c); break; }
+      catch(err){ lastErr = err; if(err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) throw err; }
+    }
+    if(!stream) throw lastErr;
     const src = ctx.createMediaStreamSource(stream);
     const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
     try{

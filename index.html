@@ -21,7 +21,7 @@ body{background:var(--bg);color:var(--ink);font:18px/1.45 Nunito,"Avenir Next",s
 main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:28px 20px 40px;text-align:center}
 h1{font-size:34px;line-height:1.05;margin:0;font-weight:800;letter-spacing:.2px}
 #tempoLine{color:var(--muted);font-size:17px;margin-top:-12px}
-#big{position:relative;width:min(62vw,300px);aspect-ratio:1;border-radius:50%;border:0;background:var(--amber);color:#2b1d16;font:800 40px/1 inherit;font-family:inherit;box-shadow:0 10px 0 #b8741f,0 22px 40px #0006;cursor:pointer;transition:transform .08s}
+#big{position:relative;width:min(62vw,300px);aspect-ratio:1;border-radius:50%;border:0;background:var(--amber);color:#2b1d16;font-family:inherit;font-size:40px;font-weight:800;line-height:1;box-shadow:0 10px 0 #b8741f,0 22px 40px #0006;cursor:pointer;transition:transform .08s}
 #big:active{transform:translateY(6px);box-shadow:0 4px 0 #b8741f,0 12px 24px #0006}
 #big.playing{background:#e8e0d6;box-shadow:0 10px 0 #9c9086,0 22px 40px #0006}
 #lamp{position:absolute;inset:-14px;border-radius:50%;border:8px solid transparent;pointer-events:none}
@@ -51,10 +51,10 @@ h1{font-size:34px;line-height:1.05;margin:0;font-weight:800;letter-spacing:.2px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #ffffff14}
 .row label{flex:1}
 .row small{display:block;color:var(--muted);font-size:14px}
-input,select{font:16px inherit;font-family:inherit;padding:8px 10px;border-radius:10px;border:1px solid #ffffff30;background:#2b1d16;color:var(--ink);min-height:44px}
+input,select{font-family:inherit;font-size:16px;padding:8px 10px;border-radius:10px;border:1px solid #ffffff30;background:#2b1d16;color:var(--ink);min-height:44px}
 input[type=number]{width:96px;text-align:right}
 input[type=checkbox]{width:26px;height:26px;min-height:0}
-.btn{font:700 16px inherit;font-family:inherit;padding:12px 18px;border-radius:12px;border:0;background:var(--amber);color:#2b1d16;min-height:44px;cursor:pointer}
+.btn{font-family:inherit;font-size:16px;font-weight:700;padding:12px 18px;border-radius:12px;border:0;background:var(--amber);color:#2b1d16;min-height:44px;cursor:pointer}
 .btn.ghost{background:#ffffff18;color:var(--ink)}
 table{width:100%;border-collapse:collapse;font-size:15px}
 td,th{padding:7px 6px;border-bottom:1px solid #ffffff14;text-align:right}
@@ -236,7 +236,7 @@ async function startPractice(){
         : e && e.name === 'NotFoundError' ? 'No microphone was found.'
         : 'I couldn\'t start the microphone (' + ((e && e.name) || 'unknown error') + ').';
     $('status').textContent = why;
-    let diag = 'v0.6 · ' + ((e && e.name) || '?') + (e && e.constraint ? ' on "' + e.constraint + '"' : '') + (e && e.message ? ' · ' + e.message : '');
+    let diag = 'v0.7 · ' + ((e && e.name) || '?') + (e && e.constraint ? ' on "' + e.constraint + '"' : '') + (e && e.message ? ' · ' + e.message : '');
     try{ const devs = await navigator.mediaDevices.enumerateDevices(); diag += ' · microphones found: ' + devs.filter(d => d.kind === 'audioinput').length; }catch(_){}
     diag += ' · ' + navigator.userAgent.replace(/^Mozilla\/5\.0 /,'').slice(0,90);
     $('diag').textContent = diag;
@@ -576,6 +576,6 @@ $('copyInfo').addEventListener('click', async () => { try{ await navigator.clipb
 renderHeader(); renderWeek();
 }
 </script>
-<div style="position:fixed;left:12px;bottom:8px;color:#cdb7a466;font-size:12px">v0.6</div>
+<div style="position:fixed;left:12px;bottom:8px;color:#cdb7a466;font-size:12px">v0.7</div>
 </body>
 </html>

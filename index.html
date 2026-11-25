@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Practice">
+<meta name="theme-color" content="#2b1d16">
+<title>Practice Coach</title>
+<style>
+/* VOICE: calm, warm, one job at a time; feedback after playing, never during
+   IDEA: a music-stand light — one big button, a beat lamp, a short note from the teacher
+   PICTURE: the start/stop button itself, with the beat lamp pulsing inside its ring
+   COLOUR: deep wood brown ground, rosin amber accent, result colours green/amber/red
+   TYPE: Nunito (rounded, kid-friendly), large sizes; LAYOUT: single centered column */
+:root{--bg:#2b1d16;--card:#3a2820;--ink:#fbefe3;--muted:#cdb7a4;--amber:#f2a541;--green:#5cc47a;--yellow:#f2c541;--red:#e8614f}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:18px/1.45 Nunito,"Avenir Next",system-ui,sans-serif;overflow-x:clip;user-select:none;-webkit-user-select:none}
+main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:28px 20px 40px;text-align:center}
+h1{font-size:34px;line-height:1.05;margin:0;font-weight:800;letter-spacing:.2px}
+#tempoLine{color:var(--muted);font-size:17px;margin-top:-12px}
+#big{position:relative;width:min(62vw,300px);aspect-ratio:1;border-radius:50%;border:0;background:var(--amber);color:#2b1d16;font:800 40px/1 inherit;font-family:inherit;box-shadow:0 10px 0 #b8741f,0 22px 40px #0006;cursor:pointer;transition:transform .08s}
+#big:active{transform:translateY(6px);box-shadow:0 4px 0 #b8741f,0 12px 24px #0006}
+#big.playing{background:#e8e0d6;box-shadow:0 10px 0 #9c9086,0 22px 40px #0006}
+#lamp{position:absolute;inset:-14px;border-radius:50%;border:8px solid transparent;pointer-events:none}
+#lamp.on{border-color:var(--amber);animation:pulse .18s ease-out}
+#lamp.accent{border-color:#fff}
+@keyframes pulse{from{transform:scale(1.04)}to{transform:scale(1)}}
+#status{font-size:22px;min-height:1.5em;font-weight:700}
+#count{font-size:64px;font-weight:800;min-height:1.1em;line-height:1}
+#result{display:none;max-width:560px;width:100%;background:var(--card);border-radius:22px;padding:20px 22px;text-align:left;gap:16px;align-items:flex-start}
+#result.show{display:flex}
+#dot{flex:none;width:56px;height:56px;border-radius:50%}
+#resText{font-size:21px;font-weight:700}
+#resSmall{color:var(--muted);font-size:16px;margin-top:6px}
+#week{color:var(--muted);font-size:16px}
+#gear{position:fixed;top:14px;right:14px;width:48px;height:48px;border-radius:50%;border:0;background:#ffffff14;color:var(--muted);font-size:24px}
+#gear{z-index:5;cursor:pointer}
+#gate{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20;padding:20px}
+#gate.show{display:flex}
+.gbox{background:var(--card);border-radius:20px;padding:24px;text-align:center;max-width:380px;width:100%;user-select:text;-webkit-user-select:text}
+#panel{z-index:10}
+/* parent panel */
+#panel{position:fixed;inset:0;background:#1c130e;overflow-y:auto;display:none;padding:22px 18px 60px;user-select:text;-webkit-user-select:text}
+#panel.show{display:block}
+.wrap{max-width:720px;margin:0 auto}
+#panel h2{font-size:28px;margin:0 0 4px}
+#panel h3{font-size:19px;margin:26px 0 8px;color:var(--amber)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #ffffff14}
+.row label{flex:1}
+.row small{display:block;color:var(--muted);font-size:14px}
+input,select{font:16px inherit;font-family:inherit;padding:8px 10px;border-radius:10px;border:1px solid #ffffff30;background:#2b1d16;color:var(--ink);min-height:44px}
+input[type=number]{width:96px;text-align:right}
+input[type=checkbox]{width:26px;height:26px;min-height:0}
+.btn{font:700 16px inherit;font-family:inherit;padding:12px 18px;border-radius:12px;border:0;background:var(--amber);color:#2b1d16;min-height:44px;cursor:pointer}
+.btn.ghost{background:#ffffff18;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:7px 6px;border-bottom:1px solid #ffffff14;text-align:right}
+td:first-child,th:first-child{text-align:left}
+#dbg{width:100%;height:220px;background:#0e0906;border-radius:12px;display:block}
+#dbgText{font:13px/1.4 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre-wrap;margin-top:8px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+@media (prefers-reduced-motion:reduce){#lamp.on{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Practice time</h1>
+  <div id="tempoLine"></div>
+  <div id="count"></div>
+  <button id="big" aria-label="Start or stop"><span id="bigLabel">Start</span><span id="lamp"></span></button>
+  <div id="status">Press Start, then play with the beat.</div>
+  <div id="result"><div id="dot"></div><div><div id="resText"></div><div id="resSmall"></div></div></div>
+  <div id="week"></div>
+</main>
+<button id="gear" aria-label="Parent settings">⚙</button>
+<div id="gate"><div class="gbox">
+  <div id="gateQ" style="font-size:20px;font-weight:700"></div>
+  <input id="gateIn" type="number" inputmode="numeric" style="width:140px;margin:14px 0;font-size:22px;text-align:center">
+  <div id="gateMsg" style="color:var(--red);min-height:1.4em"></div>
+  <div class="btns" style="justify-content:center"><button class="btn ghost" id="gateCancel">Cancel</button><button class="btn" id="gateOk">Open settings</button></div>
+</div></div>
+
+<div id="panel"><div class="wrap">
+  <h2>Parent settings</h2>
+  <div style="color:var(--muted)">Changes save on this device. Settings are hidden from the practice screen.</div>
+
+  <h3>Beat</h3>
+  <div class="row"><label for="s_bpm">Tempo now (beats per minute)</label><input id="s_bpm" type="number" min="30" max="220"></div>
+  <div class="row"><label for="s_perBeat">Notes per beat<small>Scales in quarter notes = 1, in eighth notes = 2</small></label><select id="s_perBeat"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
+  <div class="row"><label for="s_bpb">Beats per bar</label><select id="s_bpb"><option>2</option><option>3</option><option>4</option><option>6</option></select></div>
+  <div class="row"><label for="s_pattern">Click pattern<small>Quiet bars check that he keeps the beat on his own</small></label><select id="s_pattern"><option value="always">Always on</option><option value="2-1">2 bars on, 1 bar quiet</option><option value="1-1">1 bar on, 1 bar quiet</option></select></div>
+  <div class="row"><label for="s_mode">What he's practicing<small>Scales: every beat has a note. Piece: notes can be longer or have rests (experimental)</small></label><select id="s_mode"><option value="scale">Scales</option><option value="piece">Piece</option></select></div>
+
+  <h3>Tempo ladder</h3>
+  <div class="row"><label for="s_ladder">Speed up after a great run<small>Raises the tempo after each green result, up to the target</small></label><input id="s_ladder" type="checkbox"></div>
+  <div class="row"><label for="s_target">Target tempo</label><input id="s_target" type="number" min="30" max="220"></div>
+  <div class="row"><label for="s_step">Step size (bpm)</label><input id="s_step" type="number" min="1" max="20"></div>
+
+  <h3>Feedback</h3>
+  <div class="row"><label for="s_strict">How strict</label><select id="s_strict"><option value="easy">Easy</option><option value="normal">Normal</option><option value="strict">Strict</option></select></div>
+  <div class="row"><label for="s_tuning">Tuning feedback (scales)</label><input id="s_tuning" type="checkbox"></div>
+  <div class="row"><label for="s_voice">Speak the feedback out loud</label><input id="s_voice" type="checkbox"></div>
+  <div class="row"><label for="s_offset">Timing correction (ms)<small>Advanced: only change while fine-tuning</small></label><input id="s_offset" type="number" min="-200" max="200"></div>
+
+  <h3>Practice log</h3>
+  <div id="log"></div>
+
+  <h3>Last take (for fine-tuning)</h3>
+  <canvas id="dbg"></canvas>
+  <div id="dbgText">No take yet.</div>
+  <div class="btns">
+    <button class="btn ghost" id="dl">Save recording (WAV)</button>
+    <button class="btn ghost" id="copyInfo">Copy take details</button>
+  </div>
+
+  <div class="btns" style="margin-top:28px"><button class="btn" id="close">Done</button></div>
+</div></div>
+
+<script>
+{
+const $ = id => document.getElementById(id);
+const mem = {};
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('pc_'+k); return v ? JSON.parse(v) : (k in mem ? mem[k] : d); }catch(e){ return k in mem ? mem[k] : d; } },
+  set(k, v){ mem[k] = v; try{ localStorage.setItem('pc_'+k, JSON.stringify(v)); }catch(e){} }
+};
+const DEFAULTS = {bpm:72, perBeat:1, bpb:4, pattern:'2-1', mode:'scale', ladder:false, target:96, step:4, strict:'normal', tuning:true, voice:true, offset:0};
+let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
+const save = () => store.set('settings', S);
+
+/* ---------- audio setup ---------- */
+let ctx = null, stream = null, recNode = null, worklet = false, recording = false, chunks = [];
+let clickBuf = null, accBuf = null, sched = null, lastTake = null, wakeLock = null, sessionStart = 0;
+
+async function ensureAudio(){
+  if(!ctx){ const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); }
+  if(ctx.state !== 'running') await ctx.resume();
+  if(!stream){
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    const src = ctx.createMediaStreamSource(stream);
+    const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+    try{
+      const code = `class R extends AudioWorkletProcessor{constructor(){super();this.b=new Float32Array(4096);this.n=0;this.t=0;this.on=false;this.port.onmessage=e=>{this.on=e.data;this.n=0;};}
+process(i){const c=i[0]&&i[0][0];if(this.on&&c){if(this.n===0)this.t=currentTime;this.b.set(c,this.n);this.n+=c.length;if(this.n+c.length>4096){this.port.postMessage({t:this.t,d:this.b.slice(0,this.n)});this.n=0;}}return true;}}
+registerProcessor('rec-proc',R);`;
+      await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], {type:'application/javascript'})));
+      recNode = new AudioWorkletNode(ctx, 'rec-proc');
+      recNode.port.onmessage = e => { if(recording) chunks.push(e.data); };
+      worklet = true;
+    }catch(err){
+      recNode = ctx.createScriptProcessor(2048, 1, 1);
+      recNode.onaudioprocess = e => { if(recording) chunks.push({t: ctx.currentTime, d: new Float32Array(e.inputBuffer.getChannelData(0))}); };
+      worklet = false;
+    }
+    src.connect(recNode); recNode.connect(sink);
+  }
+  if(!clickBuf){ clickBuf = makeClick(0.5); accBuf = makeClick(1.0); }
+}
+function makeClick(amp){
+  const sr = ctx.sampleRate, n = Math.floor(sr*0.03), b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  let prev = 0;
+  for(let i=0;i<n;i++){ const w = Math.random()*2-1; d[i] = (w-prev)*amp*Math.exp(-i/(n*0.22)); prev = w; }
+  return b;
+}
+function playClick(t, accent){ const s = ctx.createBufferSource(); s.buffer = accent ? accBuf : clickBuf; s.connect(ctx.destination); s.start(t); }
+
+/* ---------- metronome ---------- */
+function audibleBar(bar){
+  if(S.pattern === 'always' || bar < 1) return true;
+  const [on, off] = S.pattern.split('-').map(Number);
+  return (bar % (on+off)) < on;
+}
+function startScheduler(){
+  const period = 60/S.bpm;
+  sched = {start: ctx.currentTime + 0.6, period, bpb: S.bpb, countIn: S.bpb, next: 0, beats: [], bpm: S.bpm, perBeat: S.perBeat, pattern: S.pattern, mode: S.mode};
+  sched.timer = setInterval(tick, 25); tick();
+}
+function tick(){
+  if(!sched) return;
+  for(;;){
+    const t = sched.start + sched.next*sched.period;
+    if(t > ctx.currentTime + 0.12) break;
+    const k = sched.next, inCount = k < sched.countIn;
+    const kk = inCount ? k : k - sched.countIn;
+    const beatInBar = kk % sched.bpb, bar = inCount ? -1 : Math.floor(kk/sched.bpb);
+    const audible = inCount || audibleBar(bar);
+    if(audible) playClick(t, beatInBar === 0);
+    sched.beats.push({t, inCount, bar, beatInBar, audible});
+    const wait = Math.max(0, (t - ctx.currentTime)*1000);
+    setTimeout(() => showBeat(inCount, beatInBar, audible), wait);
+    sched.next++;
+  }
+}
+function showBeat(inCount, beatInBar, audible){
+  if(!sched) return;
+  if(inCount){ $('count').textContent = beatInBar+1; $('status').textContent = 'Get ready…'; }
+  else { $('count').textContent = ''; $('status').textContent = audible ? 'Play with the beat' : 'Keep going on your own…'; }
+  const l = $('lamp'); l.className = '';
+  if(audible){ void l.offsetWidth; l.className = beatInBar === 0 ? 'on accent' : 'on'; }
+}
+
+/* ---------- start / stop ---------- */
+let busy = false;
+$('big').addEventListener('click', async () => {
+  if(busy) return;
+  if(!sched) await startPractice(); else stopPractice();
+});
+async function startPractice(){
+  busy = true;
+  try{
+    if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      throw {name:'Insecure'};
+    }
+    await ensureAudio();
+  }
+  catch(e){
+    const why = e && e.name === 'Insecure'
+      ? 'The microphone only works when this page is opened from a web address (http://localhost:8000 or the GitHub Pages link), not as a file.'
+      : e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')
+        ? 'The microphone is blocked. Allow it for this site in the browser, and for the browser in the device settings.'
+        : e && e.name === 'NotFoundError' ? 'No microphone was found.'
+        : 'I couldn\'t start the microphone (' + ((e && e.name) || 'unknown error') + ').';
+    $('status').textContent = why; busy = false; return;
+  }
+  $('result').classList.remove('show');
+  chunks = []; recording = true; if(worklet) recNode.port.postMessage(true);
+  startScheduler(); sessionStart = Date.now();
+  $('big').classList.add('playing'); $('bigLabel').textContent = 'Stop';
+  try{ if(navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+  busy = false;
+}
+function stopPractice(){
+  busy = true;
+  clearInterval(sched.timer);
+  const sch = sched; sched = null; sch.stopAt = ctx.currentTime;
+  $('count').textContent = ''; $('lamp').className = '';
+  $('big').classList.remove('playing'); $('bigLabel').textContent = 'Start';
+  $('status').textContent = 'Listening back…';
+  try{ if(wakeLock) wakeLock.release(); }catch(e){}
+  setTimeout(() => {
+    recording = false; if(worklet) recNode.port.postMessage(false);
+    let res;
+    try{ res = analyze(chunks, sch); }catch(err){ res = {color:'yellow', text:'Something went wrong listening back. Try again.', small: String(err)}; }
+    finish(res, sch);
+    busy = false;
+  }, 250);
+}
+document.addEventListener('visibilitychange', () => { if(document.hidden && sched) stopPractice(); });
+
+/* ---------- signal helpers ---------- */
+function lowpass(x, sr, fc){
+  const w0 = 2*Math.PI*fc/sr, cw = Math.cos(w0), al = Math.sin(w0)/(2*0.7071), a0 = 1+al;
+  const b0 = (1-cw)/2/a0, b1 = (1-cw)/a0, b2 = b0, a1 = -2*cw/a0, a2 = (1-al)/a0;
+  const y = new Float32Array(x.length); let x1=0,x2=0,y1=0,y2=0;
+  for(let i=0;i<x.length;i++){ const xi = x[i], yi = b0*xi + b1*x1 + b2*x2 - a1*y1 - a2*y2; y[i] = yi; x2=x1; x1=xi; y2=y1; y1=yi; }
+  return y;
+}
+const median = a => { if(!a.length) return NaN; const s = [...a].sort((p,q)=>p-q), m = s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };
+
+function calibrate(x, sr, t0, sch){
+  const hop = Math.max(1, Math.round(sr*0.002));
+  const win = Math.min(0.3, 0.8*sch.period);
+  const energy = (i0, i1) => { const out = []; for(let i=Math.max(1,i0); i+hop<=i1; i+=hop){ let s=0; for(let j=i;j<i+hop;j++){ const d = x[j]-x[j-1]; s += d*d; } out.push({i, s}); } return out; };
+  const firstPlay = sch.start + sch.countIn*sch.period;
+  const all = energy(Math.max(1, Math.floor((sch.start - t0 - 0.3)*sr)), Math.min(x.length, Math.floor((firstPlay - t0)*sr)));
+  const med = median(all.map(e => e.s)) || 1e-9;
+  const lats = [];
+  for(const b of sch.beats.filter(b => b.inCount)){
+    const i0 = Math.floor((b.t - t0)*sr), i1 = Math.min(x.length, i0 + Math.floor(win*sr));
+    if(i0 < 1 || i1 <= i0) continue;
+    const e = energy(i0, i1); if(!e.length) continue;
+    let mx = e[0]; for(const v of e) if(v.s > mx.s) mx = v;
+    if(mx.s < 8*med) continue;
+    const first = e.find(v => v.s >= 0.3*mx.s);
+    lats.push(t0 + first.i/sr - b.t);
+  }
+  if(lats.length >= 2){
+    const m = median(lats);
+    if(lats.filter(l => Math.abs(l-m) < 0.015).length >= 2) return {L:m, ok:true, n:lats.length};
+  }
+  return {L:(ctx.outputLatency||0) + (ctx.baseLatency||0) + 0.02, ok:false, n:lats.length};
+}
+
+function analyze(chs, sch){
+  if(!chs.length) return {err:true, color:'yellow', text:"I couldn't hear anything. Is the microphone allowed?"};
+  const sr = ctx.sampleRate, t0 = chs[0].t;
+  let N = 0; for(const c of chs) N += c.d.length;
+  N = Math.min(N, sr*360);
+  const x = new Float32Array(N); let o = 0;
+  for(const c of chs){ if(o >= N) break; const take = Math.min(c.d.length, N-o); x.set(c.d.subarray(0, take), o); o += take; }
+  const cal = calibrate(x, sr, t0, sch), L = cal.L;
+
+  // pitch analysis on low-passed, decimated signal
+  const D = Math.max(1, Math.round(sr/22050)), sr2 = sr/D;
+  let y = lowpass(lowpass(x, sr, 1100), sr, 1100);
+  const n2 = Math.floor(N/D), xs = new Float32Array(n2);
+  for(let i=0;i<n2;i++) xs[i] = y[i*D];
+  y = null;
+  const W = Math.round(sr2*0.022), tauMin = Math.floor(sr2/1050), tauMax = Math.ceil(sr2/115), hop = Math.round(sr2*0.01);
+  const nF = Math.max(0, Math.floor((n2 - W - tauMax - 1)/hop));
+  const rms = new Float32Array(nF), midi = new Float32Array(nF).fill(NaN), ft = new Float64Array(nF);
+  let maxR = 0;
+  for(let f=0; f<nF; f++){
+    const s = f*hop; let sum = 0;
+    for(let j=0;j<W;j++){ const v = xs[s+j]; sum += v*v; }
+    rms[f] = Math.sqrt(sum/W); if(rms[f] > maxR) maxR = rms[f];
+    ft[f] = t0 + (s + W*0.5)/sr2;
+  }
+  const firstPlay = sch.start + sch.countIn*sch.period;
+  const noise = median(Array.from(rms).filter((r,f) => ft[f] < firstPlay + L - 0.15)) || 0;
+  const thr = Math.max(0.002, 3*noise, 0.04*maxR);
+  const dd = new Float32Array(tauMax+1), cm = new Float32Array(tauMax+1);
+  for(let f=0; f<nF; f++){
+    if(rms[f] < thr) continue;
+    const s = f*hop;
+    for(let tau=1; tau<=tauMax; tau++){ let sum = 0; for(let j=0;j<W;j++){ const d = xs[s+j] - xs[s+j+tau]; sum += d*d; } dd[tau] = sum; }
+    let run = 0; cm[0] = 1;
+    for(let tau=1; tau<=tauMax; tau++){ run += dd[tau]; cm[tau] = run > 0 ? dd[tau]*tau/run : 1; }
+    let best = -1;
+    for(let tau=tauMin; tau<=tauMax; tau++){ if(cm[tau] < 0.15){ while(tau+1 <= tauMax && cm[tau+1] < cm[tau]) tau++; best = tau; break; } }
+    if(best < 0){ let mi = 9; for(let tau=tauMin; tau<=tauMax; tau++) if(cm[tau] < mi){ mi = cm[tau]; best = tau; } if(mi > 0.3) continue; }
+    let tb = best;
+    if(best > tauMin && best < tauMax){ const a = cm[best-1], b = cm[best], c = cm[best+1], den = a + c - 2*b; if(den > 0) tb = best + 0.5*(a-c)/den; }
+    const fr = sr2/tb;
+    if(fr >= 115 && fr <= 1050) midi[f] = 69 + 12*Math.log2(fr/440);
+  }
+
+  // segment into notes
+  const notes = [];
+  let cur = null, unv = 0, chg = 0, chgStart = 0;
+  const close = endF => { if(cur && endF - cur.s + 1 >= 5) { cur.e = endF; notes.push(cur); } cur = null; };
+  for(let f=0; f<nF; f++){
+    const m = midi[f];
+    if(isNaN(m)){ unv++; if(cur && unv >= 4) close(f - unv); continue; }
+    unv = 0;
+    if(!cur){ cur = {s:f, ms:[m], peak:rms[f], type:'attack'}; continue; }
+    const ref = median(cur.ms.slice(-5));
+    if(Math.abs(m - ref) >= 0.7){
+      if(chg === 0) chgStart = f; chg++;
+      if(chg >= 3){ close(chgStart - 1); cur = {s:chgStart, ms:Array.from(midi.slice(chgStart, f+1)).filter(v=>!isNaN(v)), peak:rms[f], type:'change'}; chg = 0; }
+      continue;
+    }
+    chg = 0;
+    if(f - cur.s > 8){
+      let mn = Infinity; for(let j=f-4;j<f;j++) mn = Math.min(mn, rms[j]);
+      if(rms[f] > 1.8*mn && mn < 0.45*cur.peak){ close(f-1); cur = {s:f, ms:[m], peak:rms[f], type:'attack'}; continue; }
+    }
+    cur.ms.push(m); if(rms[f] > cur.peak) cur.peak = rms[f];
+  }
+  close(nF - 1);
+  for(const n of notes){
+    let f = n.s;
+    if(n.type === 'attack'){
+      let pk = 0; for(let j=n.s; j<=Math.min(n.e, n.s+3); j++) pk = Math.max(pk, rms[j]);
+      while(f > 0 && f > n.s - 3 && rms[f-1] >= 0.35*pk) f--;
+    }
+    n.tRec = ft[f];
+    n.m = median(n.ms); n.cents = (n.m - Math.round(n.m))*100;
+  }
+
+  // compare with the beat
+  const sub = sch.period/sch.perBeat;
+  const mult = {easy:1.4, normal:1, strict:0.7}[S.strict] || 1;
+  const tol = Math.min(0.12, Math.max(0.06, 0.2*sub))*mult;
+  const lastBeat = sch.beats.length ? sch.beats[sch.beats.length-1].t : firstPlay;
+  const ev = notes.map(n => ({...n, t: n.tRec - L - S.offset/1000}))
+                  .filter(n => n.t >= firstPlay - 0.5*sub && n.t <= Math.max(lastBeat, sch.stopAt) + sub);
+  const take = {x, sr, t0, sch, cal, notes, ev, firstPlay, sub, tol, rms, ft, midi};
+  lastTake = take;
+  if(ev.length < 5) return {color:'yellow', text:"I couldn't hear enough notes. Try again a little closer to the iPad.", take};
+
+  const seen = new Set(), graded = [];
+  for(const n of ev){
+    const k = Math.round((n.t - firstPlay)/sub); n.k = k; n.off = n.t - (firstPlay + k*sub);
+    const beatIdx = Math.floor(k/sch.perBeat), bar = Math.floor(beatIdx/sch.bpb);
+    n.quiet = !(sch.pattern === 'always' || bar < 1 || (bar % (sch.pattern.split('-').map(Number).reduce((a,b)=>a+b))) < Number(sch.pattern.split('-')[0]));
+    n.ok = Math.abs(n.off) <= tol;
+    if(!seen.has(k)){ seen.add(k); graded.push(n); }
+  }
+  const total = graded.length, onBeat = graded.filter(n => n.ok).length, pct = onBeat/total;
+  const near = graded.filter(n => Math.abs(n.off) < 0.4*sub);
+  const meanOff = near.length ? near.reduce((a,n)=>a+n.off,0)/near.length : 0;
+  const lean = meanOff < -0.35*tol ? 'ahead' : meanOff > 0.35*tol ? 'behind' : '';
+  const grpMean = arr => arr.length >= 3 ? arr.reduce((a,n)=>a+n.off,0)/arr.length : null;
+  const qm = grpMean(near.filter(n=>n.quiet)), cm2 = grpMean(near.filter(n=>!n.quiet));
+  let quietMsg = '';
+  if(qm !== null && cm2 !== null){
+    if(qm < cm2 - 0.5*tol) quietMsg = 'When the click went quiet, you sped up.';
+    else if(qm > cm2 + 0.5*tol) quietMsg = 'When the click went quiet, you slowed down.';
+  }
+
+  // tempo from note-to-note gaps (scales)
+  let tempoOff = 0, played = sch.bpm, driftMsg = '';
+  if(sch.mode === 'scale'){
+    const iois = [];
+    for(let i=1;i<ev.length;i++){ const g = ev[i].t - ev[i-1].t; if(g > 0.3*sub && g < 2.2*sub) iois.push(g); }
+    if(iois.length >= 4){
+      const ratio = sub/median(iois); played = sch.bpm*ratio;
+      if(Math.abs(ratio-1) > 0.07) tempoOff = ratio - 1;
+      if(iois.length >= 8){
+        const h = iois.length>>1, a = median(iois.slice(0,h)), b = median(iois.slice(h));
+        if(a/b > 1.07) driftMsg = 'You sped up as you went.'; else if(b/a > 1.07) driftMsg = 'You slowed down as you went.';
+      }
+    }
+  }
+
+  let color, text;
+  if(tempoOff){
+    color = Math.abs(tempoOff) > 0.12 ? 'red' : 'yellow';
+    text = tempoOff > 0 ? `You rushed! You played at about ${Math.round(played)}, but the beat was ${sch.bpm}.`
+                        : `A bit slow. You played at about ${Math.round(played)}, but the beat was ${sch.bpm}.`;
+  } else if(pct >= 0.75){
+    color = 'green'; text = `Great timing! ${onBeat} of ${total} notes were right with the beat.`;
+  } else if(pct >= 0.5){
+    color = 'yellow'; text = `Pretty good. ${onBeat} of ${total} notes were with the beat.`;
+    if(lean === 'ahead') text += ' You were a little ahead of the click. Wait for it.';
+    else if(lean === 'behind') text += ' You were a little behind the click. Land each note with it.';
+  } else {
+    color = 'red';
+    text = "Let's try that again. " + (lean === 'ahead' ? 'Lots of notes came before the beat.' : lean === 'behind' ? 'Lots of notes came after the beat.' : 'Lots of notes missed the beat.');
+  }
+  const extra = tempoOff ? '' : (quietMsg || driftMsg);
+  if(extra) text += ' ' + extra;
+
+  let small = '', speakTune = '';
+  if(sch.mode === 'scale' && S.tuning){
+    const inTune = ev.filter(n => Math.abs(n.cents) <= 25).length;
+    small = `In tune: ${inTune} of ${ev.length} notes.`;
+    if(inTune/ev.length < 0.6) speakTune = ' Listen to your tuning too.';
+  }
+  if(color === 'green' && S.ladder && S.bpm < S.target){
+    S.bpm = Math.min(S.target, S.bpm + S.step); save();
+    text += ` Next time the beat goes up to ${S.bpm}.`;
+  }
+  return {color, text, small, speak: text + speakTune, take, pct, played};
+}
+
+/* ---------- results, log ---------- */
+const COLORS = {green:'var(--green)', yellow:'var(--yellow)', red:'var(--red)'};
+function finish(res, sch){
+  $('result').classList.add('show');
+  $('dot').style.background = COLORS[res.color] || COLORS.yellow;
+  $('resText').textContent = res.text;
+  $('resSmall').textContent = res.small || '';
+  $('status').textContent = res.color === 'green' ? 'Nice work!' : 'Press Start to go again.';
+  if(S.voice && window.speechSynthesis){
+    try{ const u = new SpeechSynthesisUtterance(res.speak || res.text); u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){}
+  }
+  const secs = Math.round((Date.now() - sessionStart)/1000);
+  if(secs >= 15){
+    const log = store.get('log', []);
+    log.push({d: new Date().toISOString(), secs, bpm: sch.bpm, mode: sch.mode, color: res.color, pct: res.pct == null ? null : Math.round(res.pct*100)});
+    store.set('log', log.slice(-500));
+  }
+  renderWeek(); renderHeader();
+}
+function dayKey(d){ const x = new Date(d); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+function renderWeek(){
+  const log = store.get('log', []), since = Date.now() - 7*864e5;
+  const wk = log.filter(e => new Date(e.d).getTime() >= since);
+  const days = new Set(wk.map(e => dayKey(e.d))).size, mins = Math.round(wk.reduce((a,e)=>a+e.secs,0)/60);
+  $('week').textContent = wk.length ? `This week: ${days} practice day${days===1?'':'s'}, ${mins} minute${mins===1?'':'s'}` : 'No practice logged this week yet.';
+}
+function renderHeader(){ $('tempoLine').textContent = `Beat: ${S.bpm} · ${S.mode === 'scale' ? 'Scales' : 'Piece'}`; }
+function renderLog(){
+  const log = store.get('log', []), by = {};
+  for(const e of log){ const k = dayKey(e.d); (by[k] = by[k] || {n:0, secs:0, best:null, green:0}); by[k].n++; by[k].secs += e.secs; if(e.pct != null) by[k].best = Math.max(by[k].best ?? 0, e.pct); if(e.color === 'green') by[k].green++; }
+  const keys = Object.keys(by).sort().reverse().slice(0, 14);
+  $('log').innerHTML = keys.length ? `<table><thead><tr><th>Day</th><th>Takes</th><th>Minutes</th><th>Green</th><th>Best %</th></tr></thead><tbody>${keys.map(k => `<tr><td>${k}</td><td>${by[k].n}</td><td>${Math.round(by[k].secs/60)}</td><td>${by[k].green}</td><td>${by[k].best ?? '–'}</td></tr>`).join('')}</tbody></table>` : '<div style="color:var(--muted)">Nothing logged yet.</div>';
+}
+
+/* ---------- parent panel ---------- */
+const fields = {bpm:'num', perBeat:'num', bpb:'num', pattern:'str', mode:'str', ladder:'bool', target:'num', step:'num', strict:'str', tuning:'bool', voice:'bool', offset:'num'};
+function fillPanel(){
+  for(const [k, t] of Object.entries(fields)){
+    const el = $('s_'+k); if(!el) continue;
+    if(t === 'bool') el.checked = !!S[k]; else el.value = S[k];
+  }
+}
+for(const [k, t] of Object.entries(fields)){
+  const el = $('s_'+k); if(!el) continue;
+  el.addEventListener('change', () => {
+    if(t === 'bool') S[k] = el.checked;
+    else if(t === 'num'){ const v = Number(el.value); if(!isNaN(v)) S[k] = v; }
+    else S[k] = el.value;
+    save(); renderHeader();
+  });
+}
+const gear = $('gear');
+let gateAns = 0;
+gear.addEventListener('click', () => {
+  if(sched){ $('status').textContent = 'Stop the beat first, then open settings.'; return; }
+  const a = 6 + Math.floor(Math.random()*4), b = 6 + Math.floor(Math.random()*4);
+  gateAns = a*b;
+  $('gateQ').textContent = `Grown-ups only: what is ${a} × ${b}?`;
+  $('gateIn').value = ''; $('gateMsg').textContent = '';
+  $('gate').classList.add('show');
+  setTimeout(() => $('gateIn').focus(), 50);
+});
+function checkGate(){
+  if(Number($('gateIn').value) === gateAns){ $('gate').classList.remove('show'); openPanel(); }
+  else { $('gateMsg').textContent = 'Not quite. Try again.'; $('gateIn').value = ''; }
+}
+$('gateOk').addEventListener('click', checkGate);
+$('gateIn').addEventListener('keydown', e => { if(e.key === 'Enter') checkGate(); });
+$('gateCancel').addEventListener('click', () => $('gate').classList.remove('show'));
+function openPanel(){ fillPanel(); renderLog(); $('panel').classList.add('show'); requestAnimationFrame(drawDebug); }
+$('close').addEventListener('click', () => $('panel').classList.remove('show'));
+
+function takeInfo(){
+  const t = lastTake; if(!t) return 'No take yet.';
+  return [
+    `tempo ${t.sch.bpm} bpm, ${t.sch.perBeat} note(s) per beat, ${t.sch.bpb} beats per bar, pattern ${t.sch.pattern}, mode ${t.sch.mode}`,
+    `sample rate ${t.sr}, count-in starts at ${(t.sch.start - t.t0).toFixed(3)} s into the recording, first played beat at ${(t.firstPlay - t.t0).toFixed(3)} s`,
+    `latency ${(t.cal.L*1000).toFixed(0)} ms (${t.cal.ok ? 'measured from ' + t.cal.n + ' count-in clicks' : 'estimated, clicks not heard'})`,
+    `notes found ${t.notes.length}, graded ${t.ev.length}, tolerance ±${Math.round(t.tol*1000)} ms`,
+    `offsets ms: ${t.ev.slice(0,40).map(n => n.off == null ? '?' : Math.round(n.off*1000)).join(' ')}`
+  ].join('\n');
+}
+function drawDebug(){
+  const c = $('dbg'), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W*dpr; c.height = H*dpr; const g = c.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0,0,W,H);
+  $('dbgText').textContent = takeInfo();
+  const t = lastTake; if(!t) return;
+  const tA = t.firstPlay - t.sch.period, tB = Math.min(t.firstPlay + 20, Math.max(t.sch.stopAt, tA + 2));
+  const X = tt => (tt - tA)/(tB - tA)*W;
+  for(const b of t.sch.beats){ if(b.inCount || b.t > tB) continue; g.strokeStyle = b.audible ? '#f2a54188' : '#f2a54133'; g.setLineDash(b.audible ? [] : [4,4]); g.beginPath(); g.moveTo(X(b.t), 0); g.lineTo(X(b.t), H); g.stroke(); }
+  g.setLineDash([]);
+  g.fillStyle = '#cdb7a466';
+  for(let f=0; f<t.ft.length; f++){ const tt = t.ft[f] - t.cal.L; if(tt < tA || tt > tB || isNaN(t.midi[f])) continue; const yy = H - ((t.midi[f] - 45)/40)*H; g.fillRect(X(tt), yy, 2, 2); }
+  for(const n of t.ev){ if(n.t < tA || n.t > tB) continue; g.fillStyle = n.ok ? '#5cc47a' : '#e8614f'; g.beginPath(); g.arc(X(n.t), H - 14, 6, 0, 7); g.fill(); }
+}
+$('dl').addEventListener('click', () => {
+  const t = lastTake; if(!t) return;
+  const n = t.x.length, buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+  const w = (o, s) => { for(let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36+n*2, true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24, t.sr, true); v.setUint32(28, t.sr*2, true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40, n*2, true);
+  let o = 44; for(let i=0;i<n;i++){ const s = Math.max(-1, Math.min(1, t.x[i])); v.setInt16(o, s < 0 ? s*0x8000 : s*0x7fff, true); o += 2; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
+  a.download = `take_${t.sch.bpm}bpm_${t.sch.perBeat}pb_start${(t.sch.start - t.t0).toFixed(2)}s.wav`;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+$('copyInfo').addEventListener('click', async () => { try{ await navigator.clipboard.writeText(takeInfo()); $('copyInfo').textContent = 'Copied'; setTimeout(() => $('copyInfo').textContent = 'Copy take details', 1500); }catch(e){} });
+
+renderHeader(); renderWeek();
+}
+</script>
+</body>
+</html>
